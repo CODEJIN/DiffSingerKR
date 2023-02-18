@@ -16,6 +16,7 @@ This code is an implementation of DiffSinger for Korean. The algorithm is based 
 * I changed several hyper parameters and data type
     * One of mel or spectrogram is can be selected as a feature type.
     * Token type is changed from phoneme to grapheme.
+    * Becuase of the supported vocoder, I changed the sample rate of model to 22050Hz.
 
 # Supported dataset
 
@@ -25,7 +26,7 @@ This code is an implementation of DiffSinger for Korean. The algorithm is based 
 | X      | | AIHub Korean Multi-Singer Song Dataset | [Link](https://aihub.or.kr/aihubdata/data/view.do?currMenu=115&topMenu=100&dataSetSn=465) |
 
 * I fixed some midi score to matching between note and wav F0.
-* CSD dataset is used for the training of current checkpoint.
+* CSD dataset is used for the training of shared checkpoint.
 * [Pattern generator.py](./Pattern_Generator.py) supports the AIHub Dataset, but I did not used for the training of shared checkpoint.
 
 # Hyper parameters
@@ -39,6 +40,15 @@ Before proceeding, please set the pattern, inference, and checkpoint paths in [H
 
 * Notes
     * The highest note value for embedding.
+
+* Durations
+    * The highest duration value for embedding.
+
+* Genres
+    * Setting the number of genres.
+
+* Singers
+    * Setting the number of singers.
 
 * Duration
     * Min duration is used at pattern generating only.
@@ -100,12 +110,6 @@ python Pattern_Generate.py [parameters]
     * The smaller step is, the more patterns are created in one song.
 * -hp
     * The path of hyperparameter.
-    
-# Inference file path while training for verification.
-
-* Inference_for_Training
-    * There are three examples for inference.
-    * It is midi file based script.
 
 # Training
 
