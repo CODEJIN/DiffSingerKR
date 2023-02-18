@@ -6,8 +6,8 @@ Sound:
     Sample_Rate: 22050
     Mel_F_Min: 0
     Mel_F_Max: 8000
-    F0_Min: 50  # C2
-    F0_Max: 880    # C7
+    F0_Min: 65  # C2
+    F0_Max: 2094    # C7
 
 Feature_Type: 'Mel' #'Spectrogram', 'Mel'
 

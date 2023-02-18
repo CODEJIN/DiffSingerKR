@@ -15,7 +15,7 @@ This code is an implementation of DiffSinger for Korean. The algorithm is based 
     * Aux decoder and Diffusion are learned at the same time, not two stage.
 * I changed several hyper parameters and data type
     * One of mel or spectrogram is can be selected as a feature type.
-    * Token type is changed from phoneme to grapheme.* 
+    * Token type is changed from phoneme to grapheme.
 
 # Supported dataset
 
