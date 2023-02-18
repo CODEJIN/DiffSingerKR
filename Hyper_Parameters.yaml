@@ -1,0 +1,122 @@
+Sound:
+    N_FFT: 2048
+    Mel_Dim: 80
+    Frame_Length: 1024
+    Frame_Shift: 256
+    Sample_Rate: 22050
+    Mel_F_Min: 0
+    Mel_F_Max: 8000
+    F0_Min: 50  # C2
+    F0_Max: 880    # C7
+
+Feature_Type: 'Mel' #'Spectrogram', 'Mel'
+
+Tokens: 77
+Notes: 128
+Durations: 5000
+Genres: 1
+Singers: 1
+Duration:
+    Equality: false
+    Consonant_Duration: 3   # This is only used when Equality is False.
+
+Encoder:
+    Size: 384
+    ConvFFT:
+        Stack: 6
+        Head: 2
+        Dropout_Rate: 0.1
+        Conv:
+            Stack: 2
+            Kernel_Size: 5
+        FFN:
+            Kernel_Size: 17
+
+Diffusion:
+    Max_Step: 100
+    Size: 256
+    Kernel_Size: 5
+    Stack: 20
+
+Token_Path: 'D:/Datasets/22K.Music/Token.yaml'
+Spectrogram_Range_Info_Path: 'D:/Datasets/22K.Music/Spectrogram_Range_Info.yaml'
+Mel_Range_Info_Path: 'D:/Datasets/22K.Music/Mel_Range_Info.yaml'
+Log_F0_Info_Path: 'D:/Datasets/22K.Music/Log_F0_Info.yaml'
+Log_Energy_Info_Path: 'D:/Datasets/22K.Music/Log_Energy_Info.yaml'
+Singer_Info_Path: 'D:/Datasets/22K.Music/Singer_Info.yaml'
+Genre_Info_Path: 'D:/Datasets/22K.Music/Genre_Info.yaml'
+Train:
+    Train_Pattern:
+        Path: 'D:/Datasets/22K.Music/Train'
+        Metadata_File: 'METADATA.PICKLE'
+        Accumulated_Dataset_Epoch: 10000    # This is to prevent slow down from torch.utils.data.DataLoader when the number of patterns is small.
+        Augmentation_Ratio: 0.0
+    Eval_Pattern:
+        Path: 'D:/Datasets/22K.Music/Eval'
+        Metadata_File: 'METADATA.PICKLE'
+        Accumulated_Dataset_Epoch: 32   # When singer is 1, evaluation pattern is also 1. Because offset is selected randomly, this is meaningful.
+    Num_Workers: 0
+    Batch_Size: 128
+    Learning_Rate:
+        Initial: 1.0e-4
+        Warmup_Step: 4000
+    Pattern_Length: 500
+    ADAM:
+        Beta1: 0.9
+        Beta2: 0.999
+        Epsilon: 1.0e-7
+    Weight_Decay: 1.0e-6
+    Gradient_Norm: 1.0
+    Discriminator_Lambda: 1.0
+    Max_Step: 300000
+    Discrimination_Step: 0
+    Checkpoint_Save_Interval: 5000
+    Logging_Interval: 1
+    Evaluation_Interval: 1000
+    Inference_Interval: 5000
+    Initial_Inference: true
+    Inference_in_Train:
+        Duration: [
+            [0.33,0.16,0.33,0.49,0.33,0.16,0.81,0.33,0.16,0.16,0.33,0.16,0.49,0.16,0.82,0.33,0.16,0.33,0.49,0.33,0.16,0.33,0.49,0.33,0.33,0.16,0.33,1.47,0.33,0.16,0.33,0.49,0.33,0.16,0.81,0.33,0.16,0.16,0.33,0.16,0.49,0.16,0.82,0.33,0.16,0.33,0.16,0.33,0.49,0.16,0.33,0.33,0.33,0.33,0.16,0.33,0.82],
+            [0.52,0.17,0.35,0.35,0.35,0.35,0.70,0.35,0.35,0.70,0.35,0.35,0.70,0.52,0.17,0.35,0.35,0.35,0.35,0.70,0.35,0.35,0.35,0.35,1.39,],
+            [0.53,0.52,0.50,0.57,0.58,0.46,0.48,0.50,0.37,0.13,0.43,0.21,0.57,0.43,0.49,1.44,0.26,0.49,0.14,0.13,0.57,0.26,0.06,0.15,0.63,0.26,0.51,0.20,0.48,0.72,0.22,],            
+            ]
+        Lyric: [
+            ['마','음','울','적','한','날','에','<X>','거','리','를','걸','어','보','고','향','기','로','운','칵','테','일','에','취','해','도','보','고','한','편','의','시','가','있','는','<X>','전','시','회','장','도','가','고','밤','새','도','<X>','록','그','리','움','에','편','질','쓰','고','파',],
+            ['떴','다','떴','다','비','행','기','날','아','라','날','아','라','높','이','높','이','날','아','라','우','리','비','행','기',],
+            ['만','나','고','<X>','난','외','로','움','을','<X>','알','았','어','내','겐','<X>','관','심','조','<X>','차','<X>','없','<X>','다','는','걸','<X>','알','면','서',]
+            ]
+        Note: [
+            [80,80,80,87,85,84,82,0,84,84,84,85,84,79,79,77,77,77,80,80,78,77,75,77,80,79,80,82,80,80,80,87,85,84,82,0,84,84,84,85,84,79,79,77,77,77,79,80,80,77,75,75,77,80,79,82,80,],
+            [76,74,72,74,76,76,76,74,74,74,76,79,79,76,74,72,74,76,76,76,74,74,76,74,72,],
+            [76,78,79,0,71,74,72,71,72,0,71,69,69,71,74,0,79,78,79,0,71,0,74,0,74,72,72,0,71,71,69,]
+            ]
+        Singer: [
+            'CSD',
+            'CSD',
+            ]
+        Genre: [
+            'Children',
+            'Children',
+            ]
+
+Inference_Batch_Size: 8
+Inference_Path: './results/Exp_0005/Inference'
+Checkpoint_Path: './results/Exp_0005/Checkpoint'
+Log_Path: './results/Exp_0005/Log'
+
+Weights_and_Biases:
+    Use: true
+    # Use: false
+    Project: 'DiffSinger'
+    Entity: 'codejin'
+    Name: 'Exp_0005'
+    Save_Checkpoint:
+        Use: false
+        Interval: 50000 # Unlike local, The capacity of WandB is small.
+
+Use_Mixed_Precision: true
+# Use_Multi_GPU: true
+# Device: '0,1,2,3,4,5,6,7'
+Use_Multi_GPU: false
+Device: '0'
