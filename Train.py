@@ -578,9 +578,9 @@ class Trainer:
             path = os.path.join(self.hp.Checkpoint_Path, 'S_{}.pt'.format(self.steps).replace('\\', '/'))
 
         state_dict = torch.load(path, map_location= 'cpu')
-        self.model_dict['DiffSinger'].load_state_dict(state_dict['Model']['DiffSinger'])
-        self.optimizer_dict['DiffSinger'].load_state_dict(state_dict['Optimizer']['DiffSinger'])
-        self.scheduler_dict['DiffSinger'].load_state_dict(state_dict['Scheduler']['DiffSinger'])
+        self.model_dict['DiffSVS'].load_state_dict(state_dict['Model']['DiffSVS'])
+        self.optimizer_dict['DiffSVS'].load_state_dict(state_dict['Optimizer']['DiffSVS'])
+        self.scheduler_dict['DiffSVS'].load_state_dict(state_dict['Scheduler']['DiffSVS'])
         self.steps = state_dict['Steps']
 
         logging.info('Checkpoint loaded at {} steps in GPU {}.'.format(self.steps, self.gpu_id))
@@ -592,13 +592,13 @@ class Trainer:
         os.makedirs(self.hp.Checkpoint_Path, exist_ok= True)
         state_dict = {
             'Model': {
-                'DiffSinger': self.model_dict['DiffSinger'].state_dict(),
+                'DiffSVS': self.model_dict['DiffSVS'].state_dict(),
                 },
             'Optimizer': {
-                'DiffSinger': self.optimizer_dict['DiffSinger'].state_dict(),
+                'DiffSVS': self.optimizer_dict['DiffSVS'].state_dict(),
                 },
             'Scheduler': {
-                'DiffSinger': self.scheduler_dict['DiffSinger'].state_dict(),
+                'DiffSVS': self.scheduler_dict['DiffSVS'].state_dict(),
                 },
             'Steps': self.steps
             }
