@@ -38,21 +38,21 @@ Diffusion:
     Kernel_Size: 5
     Stack: 20
 
-Token_Path: 'D:/Datasets/22K.Music/Token.yaml'
-Spectrogram_Range_Info_Path: 'D:/Datasets/22K.Music/Spectrogram_Range_Info.yaml'
-Mel_Range_Info_Path: 'D:/Datasets/22K.Music/Mel_Range_Info.yaml'
-Log_F0_Info_Path: 'D:/Datasets/22K.Music/Log_F0_Info.yaml'
-Log_Energy_Info_Path: 'D:/Datasets/22K.Music/Log_Energy_Info.yaml'
-Singer_Info_Path: 'D:/Datasets/22K.Music/Singer_Info.yaml'
-Genre_Info_Path: 'D:/Datasets/22K.Music/Genre_Info.yaml'
+Token_Path: 'F:/Datasets/22K.DiffSinterKR.CSD/Token.yaml'
+Spectrogram_Range_Info_Path: 'F:/Datasets/22K.DiffSinterKR.CSD/Spectrogram_Range_Info.yaml'
+Mel_Range_Info_Path: 'F:/Datasets/22K.DiffSinterKR.CSD/Mel_Range_Info.yaml'
+Log_F0_Info_Path: 'F:/Datasets/22K.DiffSinterKR.CSD/Log_F0_Info.yaml'
+Log_Energy_Info_Path: 'F:/Datasets/22K.DiffSinterKR.CSD/Log_Energy_Info.yaml'
+Singer_Info_Path: 'F:/Datasets/22K.DiffSinterKR.CSD/Singer_Info.yaml'
+Genre_Info_Path: 'F:/Datasets/22K.DiffSinterKR.CSD/Genre_Info.yaml'
 Train:
     Train_Pattern:
-        Path: 'D:/Datasets/22K.Music/Train'
+        Path: 'F:/Datasets/22K.DiffSinterKR.CSD/Train'
         Metadata_File: 'METADATA.PICKLE'
         Accumulated_Dataset_Epoch: 10000    # This is to prevent slow down from torch.utils.data.DataLoader when the number of patterns is small.
         Augmentation_Ratio: 0.0
     Eval_Pattern:
-        Path: 'D:/Datasets/22K.Music/Eval'
+        Path: 'F:/Datasets/22K.DiffSinterKR.CSD/Eval'
         Metadata_File: 'METADATA.PICKLE'
         Accumulated_Dataset_Epoch: 32   # When singer is 1, evaluation pattern is also 1. Because offset is selected randomly, this is meaningful.
     Num_Workers: 0
@@ -106,8 +106,7 @@ Checkpoint_Path: './results/Checkpoint'
 Log_Path: './results/Log'
 
 Weights_and_Biases:
-    Use: true
-    # Use: false
+    Use: false
     Project: 'DiffSinger'
     Entity: 'codejin'
     Name: 'Test'

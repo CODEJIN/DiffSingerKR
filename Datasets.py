@@ -114,7 +114,7 @@ class Dataset(torch.utils.data.Dataset):
 
         feature = pattern_dict[self.feature_type]
         feature_min = self.feature_range_info_dict[pattern_dict['Singer']]['Min']
-        feature_max = self.feature_range_info_dict[pattern_dict['Singer']]['Max']        
+        feature_max = self.feature_range_info_dict[pattern_dict['Singer']]['Max']
         feature = (pattern_dict[self.feature_type] - feature_min) / (feature_max - feature_min) * 2.0 - 1.0
 
         singer = self.singer_info_dict[pattern_dict['Singer']]

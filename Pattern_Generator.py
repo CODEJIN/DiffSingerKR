@@ -1,19 +1,29 @@
 import numpy as np
-import mido, os, pickle, yaml, argparse, math, librosa, hgtk, logging
+import mido, os, pickle, yaml, argparse, math, librosa, hgtk, logging, sys, warnings
+import matplotlib
+matplotlib.use('agg')
+import matplotlib.pyplot as plt
 from tqdm import tqdm
 from pysptk.sptk import rapt
 from typing import List, Tuple
 from argparse import Namespace  # for type
 import torch
+import pandas as pd
 from typing import Dict
 
 from meldataset import mel_spectrogram, spectrogram, spec_energy
 from Arg_Parser import Recursive_Parse
 
+logging.basicConfig(
+    level=logging.INFO, stream=sys.stdout,
+    format= '%(asctime)s (%(module)s:%(lineno)d) %(levelname)s: %(message)s'
+    )
+warnings.filterwarnings('ignore')
 
 def AIHub_Mediazen(
     hyper_paramters: Namespace,
-    dataset_path: str
+    dataset_path: str,
+    verbose: bool= False
     ):
     skipping_label = [line.strip() for line in open('AIHub_Mediazen_Skipping.txt', 'r').readlines()]    # This is temporal
 
@@ -31,29 +41,37 @@ def AIHub_Mediazen(
             path_dict[key]['wav' if extension.upper() == '.WAV' else 'mid'] = os.path.join(root, file).replace('\\', '/')            
 
     paths = [
-        (value['wav'], value['mid'], key.strip().split('_')[0].upper(), key.strip().split('_')[4].upper())
+        (value['wav'], value['mid'], key.strip().split('_')[0].upper(), 'AM' + key.strip().split('_')[4].upper())
         for key, value in path_dict.items()
         if 'wav' in value.keys() and 'mid' in value.keys()
         ]
+    paths = [
+        path for path in paths
+        if not os.path.basename(path[0]) in [
+            'ba_10754_+2_s_yej_f_04.wav',
+            'ro_15699_+0_s_s18_m_04.wav',
+            'ro_23930_-2_a_lsb_f_02.wav'
+            ]
+        ]   # invalid patterns
     genre_dict = {
         'BA': 'Ballade',
         'RO': 'Rock',
         'TR': 'Trot'
         }
 
+    is_eval_generated = False
     for index, (wav_path, midi_path, genre, singer) in tqdm(
         enumerate(paths),
         total= len(paths),
         desc= 'AIHub_Mediazen'
         ):
         music_label = os.path.splitext(os.path.basename(wav_path))[0]
-        pattern_path = os.path.join(
-            hyper_paramters.Train.Train_Pattern.Path if not index == (len(paths) - 1) else hyper_paramters.Train.Eval_Pattern.Path,
-            'AIHub_Mediazen',
-            singer,
-            f'{music_label}.pickle'
-            ).replace('\\', '/')
-        if os.path.exists(pattern_path):
+        if any([
+            os.path.exists(os.path.join(x, 'AIHub_Mediazen', singer, f'{music_label}.pickle').replace('\\', '/'))
+            for x in [hyper_paramters.Train.Eval_Pattern.Path, hyper_paramters.Train.Train_Pattern.Path]
+            ] + [
+            os.path.exists(os.path.join('./note_error/AIHub_Mediazen', singer, f'{music_label}.png'))
+            ]):
             continue
         genre = genre_dict[genre]
 
@@ -71,7 +89,10 @@ def AIHub_Mediazen(
                     if message.time < 0.1:
                         music[-1][0] += message.time
                     else:
-                        music.append([message.time, '<X>', 0])
+                        if len(music) > 0 and music[-1][1] == '<X>':
+                            music[-1][0] += message.time
+                        else:
+                            music.append([message.time, '<X>', 0])
                 else:
                     note_states[last_note]['Time'] += message.time
                 note_states[message.note] = {
@@ -81,7 +102,8 @@ def AIHub_Mediazen(
                 last_note = message.note                
             elif message.type == 'lyrics':
                 if message.text == '\r' or last_note is None:    # If there is a bug in lyric
-                    logging.warning(f'{wav_path} | {midi_path}')
+                    if verbose:
+                        logging.warning(f'{wav_path} | {midi_path}')
                     continue
                 note_states[last_note]['Lyric'] = message.text.strip()
                 note_states[last_note]['Time'] += message.time
@@ -92,12 +114,15 @@ def AIHub_Mediazen(
                 last_note = None
             else:
                 if len(note_states) == 0:
-                    music.append([message.time, '<X>', 0])
+                    if len(music) > 0 and music[-1][1] == '<X>':
+                        music[-1][0] += message.time
+                    else:
+                        music.append([message.time, '<X>', 0])
                 else:
                     note_states[last_note]['Time'] += message.time
         if len(note_states) > 0:
-            print(wav_path, midi_path)
-            print(note_states)
+            logging.critical(wav_path, midi_path)
+            logging.critical(note_states)
             assert False
         music = [x for x in music if x[0] > 0.0]
 
@@ -122,17 +147,21 @@ def AIHub_Mediazen(
             continue
 
         audio = librosa.util.normalize(audio) * 0.95
-        
         lyrics, notes, durations = Convert_Feature_Based_Music(
             music= music,
             sample_rate= hyper_paramters.Sound.Sample_Rate,
             frame_shift= hyper_paramters.Sound.Frame_Shift,
             consonant_duration= hyper_paramters.Duration.Consonant_Duration,
-            equality_duration= hyper_paramters.Duration.Equality
+            equality_duration= hyper_paramters.Duration.Equality,
+            verbose= verbose
             )
-        lyrics_expand, notes_expand, durations_expand = Expand_by_Duration(lyrics, notes, durations)
+        lyrics_expand, notes_expand, durations_expand = Expand_by_Duration(
+            lyrics= lyrics,
+            notes= notes,
+            durations= durations
+            )
         
-        Pattern_File_Generate(
+        is_generated = Pattern_File_Generate(
             lyric= lyrics,
             note= notes,
             duration= durations,
@@ -144,13 +173,141 @@ def AIHub_Mediazen(
             singer= singer,
             genre= genre,
             dataset= 'AIHub_Mediazen',
-            is_eval_music= index == (len(paths) - 1),
+            is_eval_music= not is_eval_generated or np.random.rand() < 0.001,
             hyper_paramters= hyper_paramters
             )
 
+        is_eval_generated = is_eval_generated or is_generated
+
+def CSD(
+    hyper_paramters: Namespace,
+    dataset_path: str,
+    verbose: bool= False
+    ):
+    paths = []
+    for root, _, files in os.walk(os.path.join(dataset_path, 'wav').replace('\\', '/')):
+        for file in sorted(files):
+            if os.path.splitext(file)[1] != '.wav':
+                continue
+            wav_path = os.path.join(root, file).replace('\\', '/')
+            midi_path = wav_path.replace('wav', 'csv')
+            lyric_path = os.path.join(root.replace('wav', 'lyric'), file.replace('wav', 'txt'))
+            
+            if not os.path.exists(midi_path):
+                raise FileExistsError(midi_path)
+
+            paths.append((wav_path, midi_path, lyric_path))
+
+    csd_phoneme_dict = {
+        'eu': 'ㅡ', 'e': 'ㅔ', 'i': 'ㅣ', 'b': 'ㅂ', 'ss': 'ㅆ', 'd': 'ㄷ', 'p': 'ㅍ', 'j': 'ㅈ', 'ch': 'ㅊ', 'a': 'ㅏ',
+        'k': 'ㅋ', 'l': 'ㄹ', 'm': 'ㅁ', 'n': 'ㄴ', 'o': 'ㅗ', 'yu': 'ㅠ', 'u': 'ㅜ', 's': 'ㅅ', 't': 'ㅌ', 'eo': 'ㅓ',
+        'r': 'ㄹ', 'wa': 'ㅘ', 'h': 'ㅎ', 'kk': 'ㄲ', 'yo': 'ㅛ', 'g': 'ㄱ', 'ae': 'ㅐ', 'ui': 'ㅢ', 'pp': 'ㅃ', 'yeo': 'ㅕ',
+        'ng': 'ㅇ', 'ye': 'ㅖ', 'jj': 'ㅉ', 'ya': 'ㅑ', 'tt': 'ㄸ', 'wi': 'ㅟ', 'weo': 'ㅝ', 'wae': 'ㅙ', 'oe': 'ㅚ'
+        }
+
+    for index, (wav_path, midi_path, lyric_path) in tqdm(
+        enumerate(paths),
+        total= len(paths),
+        desc= 'CSD'
+        ):
+        music_label = os.path.splitext(os.path.basename(wav_path))[0]
+        pattern_path = os.path.join(
+            hyper_paramters.Train.Train_Pattern.Path if not index == (len(paths) - 1) else hyper_paramters.Train.Eval_Pattern.Path,
+            'CSD',
+            'CSD',
+            f'{music_label}.pickle'
+            ).replace('\\', '/')
+        if os.path.exists(pattern_path) or os.path.exists(os.path.join(f'./note_error/CSD/CSD/{music_label}.png')):
+            continue
+
+        mid = pd.read_csv(midi_path)
+        lyric = ''.join(open(lyric_path, encoding= 'utf-8-sig').readlines()).replace('\n', '').replace(' ', '')
+        music = []
+        for x, syllable in zip(mid.iloc, lyric):
+            if len(music) == 0 and x.start > 0.0:
+                music.append([0.0, x.start, '<X>', 0])
+            if len(music) > 0 and music[-1][1] != x.start:
+                music.append([music[-1][1], x.start, '<X>', 0])
+            music.append([
+                x.start,
+                x.end,
+                syllable,
+                x.pitch + 12
+                ])
+
+        music = [
+            (end - start, syllable, note)
+            for start, end, syllable, note in music
+            ]
+        audio, _ = librosa.load(wav_path, sr= hyper_paramters.Sound.Sample_Rate)
+        
+        initial_audio_length = audio.shape[0]
+        while True:
+            if music[0][1] == '<X>':
+                audio = audio[int(music[0][0] * hyper_paramters.Sound.Sample_Rate):]
+                music = music[1:]
+            else:
+                break
+        while True:
+            if music[-1][1] == '<X>':
+                music = music[:-1]
+            else:
+                break
+        audio = audio[:int(sum([x[0] for x in music]) * hyper_paramters.Sound.Sample_Rate)]    # remove last silence
+        
+        # This is to avoid to use wrong data.
+        if initial_audio_length * 0.5 > audio.shape[0]:
+            continue
+
+        audio = librosa.util.normalize(audio) * 0.95
+        
+        lyrics, notes, durations = Convert_Feature_Based_Music(
+            music= music,
+            sample_rate= hyper_paramters.Sound.Sample_Rate,
+            frame_shift= hyper_paramters.Sound.Frame_Shift,
+            consonant_duration= hyper_paramters.Duration.Consonant_Duration,
+            equality_duration= hyper_paramters.Duration.Equality,
+            verbose= verbose
+            )
+        lyrics_expand, notes_expand, durations_expand = Expand_by_Duration(
+            lyrics= lyrics,
+            notes= notes,
+            durations= durations
+            )
+
+        Pattern_File_Generate(
+            lyric= lyrics,
+            note= notes,
+            duration= durations,
+            lyric_expand= lyrics_expand,
+            note_expand= notes_expand,
+            duration_expand= durations_expand,
+            audio= audio,
+            music_label= music_label,
+            singer= 'CSD',
+            genre= 'Children',
+            dataset= 'CSD',
+            is_eval_music= index == (len(paths) - 1),
+            hyper_paramters= hyper_paramters,
+            verbose= verbose
+            )
+
+
+
+
+
+
+
+
+
+
+
+
+
 def CSD_Fix(
     hyper_paramters: Namespace,
-    dataset_path: str
+    dataset_path: str,
+    verbose: bool= False
     ):
     paths = []
     for root, _, files in os.walk(os.path.join(dataset_path, 'wav').replace('\\', '/')):
@@ -177,7 +334,7 @@ def CSD_Fix(
             'CSD',
             f'{music_label}.pickle'
             ).replace('\\', '/')
-        if os.path.exists(pattern_path):
+        if os.path.exists(pattern_path) or os.path.exists(os.path.join(f'./note_error/CSD/CSD/{music_label}.png')):
             continue
 
         mid = mido.MidiFile(midi_path, charset='CP949')
@@ -204,7 +361,8 @@ def CSD_Fix(
                 last_note = message.note                
             elif message.type == 'lyrics':
                 if message.text == '\r':    # If there is a bug in lyric
-                    logging.warning(wav_path, midi_path)
+                    if verbose:
+                        logging.warning(wav_path, midi_path)
                     continue
                 note_states[last_note]['Lyric'] = message.text.strip()
                 note_states[last_note]['Time'] += message.time
@@ -219,8 +377,8 @@ def CSD_Fix(
                 else:
                     note_states[last_note]['Time'] += message.time
         if len(note_states) > 0:
-            print(wav_path, midi_path)
-            print(note_states)
+            logging.critical(wav_path, midi_path)
+            logging.critical(note_states)
             assert False
         music = [x for x in music if x[0] > 0.0]
 
@@ -251,9 +409,14 @@ def CSD_Fix(
             sample_rate= hyper_paramters.Sound.Sample_Rate,
             frame_shift= hyper_paramters.Sound.Frame_Shift,
             consonant_duration= hyper_paramters.Duration.Consonant_Duration,
-            equality_duration= hyper_paramters.Duration.Equality
+            equality_duration= hyper_paramters.Duration.Equality,
+            verbose= verbose
             )
-        lyrics_expand, notes_expand, durations_expand = Expand_by_Duration(lyrics, notes, durations)
+        lyrics_expand, notes_expand, durations_expand = Expand_by_Duration(
+            lyrics= lyrics,
+            notes= notes,
+            durations= durations
+            )
 
         Pattern_File_Generate(
             lyric= lyrics,
@@ -268,7 +431,8 @@ def CSD_Fix(
             genre= 'Children',
             dataset= 'CSD',
             is_eval_music= index == (len(paths) - 1),
-            hyper_paramters= hyper_paramters
+            hyper_paramters= hyper_paramters,
+            verbose= verbose
             )
 
 def Convert_Feature_Based_Music(
@@ -276,7 +440,8 @@ def Convert_Feature_Based_Music(
     sample_rate: int,
     frame_shift: int,
     consonant_duration: int= 3,
-    equality_duration: bool= False
+    equality_duration: bool= False,
+    verbose: bool= False
     ):
     previous_used = 0
     lyrics = []
@@ -291,6 +456,10 @@ def Convert_Feature_Based_Music(
             lyrics.append(lyric)
             notes.append(note)
             durations.append(duration)
+        elif duration < 3:
+            if verbose:
+                logging.warning(f'too short duration than lyric: {duration} < 3')
+            return None, None, None
         else:
             lyrics.extend(Decompose(lyric))
             notes.extend([note] * 3)
@@ -311,7 +480,7 @@ def Expand_by_Duration(
     lyrics: List[str],
     notes: List[int],
     durations: List[int],
-    ):
+    ) -> Tuple[List[str], List[int], List[int]]:
     lyrics = sum([[lyric] * duration for lyric, duration in zip(lyrics, durations)], [])
     notes = sum([*[[note] * duration for note, duration in zip(notes, durations)]], [])
     durations = [index for duration in durations for index in range(duration)]
@@ -338,6 +507,8 @@ def Pattern_File_Generate(
     music_label: str,
     is_eval_music: bool,
     hyper_paramters: Namespace,
+    note_error_criterion: float= 1.0,
+    verbose: bool= False
     ):
     spect = spectrogram(
         y= torch.from_numpy(audio).float().unsqueeze(0),
@@ -403,7 +574,77 @@ def Pattern_File_Generate(
             else:
                 logging.warning(f'\'{dataset}-{singer}-{music_label}\' is skipped because the audio and midi length incompatible.')
                 return
-        
+
+    # criterion = 1.0, this is just empirical criterion.
+    note_from_f0 = Note_Predictor(log_f0).astype(np.float16)
+    note_from_midi = np.array(note_expand).astype(np.float16)
+    note_from_f0_without_0, note_from_midi_without_0 = note_from_f0[(note_from_f0 > 0) * (note_from_midi > 0)], note_from_midi[(note_from_f0 > 0) * (note_from_midi > 0)]
+    note_error_value = np.abs(note_from_f0_without_0 - note_from_midi_without_0).mean()
+
+    # octave problem fix
+    if note_error_value > note_error_criterion:
+        is_fixed = False
+        if np.abs(note_from_f0_without_0 - note_from_midi_without_0 - 12.0).mean() < note_error_criterion:
+            note = [(x + 12 if x != 0 else x) for x in note]
+            note_expand = [(x + 12 if x != 0 else x) for x in note_expand]
+            note_fix_from_midi = np.array(note_expand).astype(np.float16)
+            note_fix_from_midi_without_0 = note_fix_from_midi[(note_from_f0 > 0) * (note_from_midi > 0)]
+            note_fix_error_value = np.abs(note_from_f0_without_0 - note_fix_from_midi_without_0).mean()
+            is_fixed = True
+        elif np.abs(note_from_f0_without_0 - note_from_midi_without_0 + 12.0).mean() < note_error_criterion:
+            note = [(x - 12 if x != 0 else x) for x in note]
+            note_expand = [(x - 12 if x != 0 else x) for x in note_expand]
+            note_fix_from_midi = np.array(note_expand).astype(np.float16)
+            note_fix_from_midi_without_0 = note_fix_from_midi[(note_from_f0 > 0) * (note_from_midi > 0)]
+            note_fix_error_value = np.abs(note_from_f0_without_0 - note_fix_from_midi_without_0).mean()
+            is_fixed = True
+        if is_fixed:
+            if verbose:
+                logging.warning(
+                    f'the note octave of \'{dataset}-{singer}-{music_label}\' is fixed because the audio and midi note incompatible'
+                    f'(note error = {note_error_value:.3f}, fixed note error = {note_fix_error_value:.3f}).'
+                    'Note graph is exported at \'./note_fix\' path.'
+                    )
+                os.makedirs(os.path.join('./note_fix', dataset, singer), exist_ok= True)
+                plt.figure(figsize= (50, 10))
+                plt.plot(note_from_f0, label= 'F0 Note')
+                plt.plot(note_from_midi, label= 'MIDI Note')
+                plt.plot(note_fix_from_midi, label= 'Fixed MIDI Note')
+                plt.xticks(
+                    ticks= [x for x in [0.0] + np.cumsum(duration).tolist()[:-1]],
+                    labels= [x for x in lyric],
+                    )
+                for x in [x for x in [0.0] + np.cumsum(duration).tolist()[:-1]]:
+                    plt.axvline(x= x, linewidth= 0.5)
+                plt.margins(x= 0)
+                plt.legend()
+                plt.tight_layout()
+                plt.savefig(os.path.join('./note_fix', dataset, singer, f'{music_label}.png').replace('\\', '/'))
+                plt.close()
+        else:
+            if verbose:
+                logging.warning(
+                    f'\'{dataset}-{singer}-{music_label}\' is skipped because the audio and midi note incompatible(note error = {note_error_value:.3f}).'
+                    'This could be due to a misaligned octave in the MIDI or a synchronization issue between the audio and MIDI.'
+                    'Note graph is exported at \'./note_error\' path.'
+                    )
+                os.makedirs(os.path.join('./note_error', dataset, singer), exist_ok= True)
+                plt.figure(figsize= (50, 10))
+                plt.plot(note_from_f0, label= 'F0 Note')
+                plt.plot(note_from_midi, label= 'MIDI Note')
+                plt.xticks(
+                    ticks= [x for x in [0.0] + np.cumsum(duration).tolist()[:-1]],
+                    labels= [x for x in lyric],
+                    )
+                for x in [x for x in [0.0] + np.cumsum(duration).tolist()[:-1]]:
+                    plt.axvline(x= x, linewidth= 0.5)
+                plt.margins(x= 0)
+                plt.legend()            
+                plt.tight_layout()
+                plt.savefig(os.path.join('./note_error', dataset, singer, f'{music_label}.png').replace('\\', '/'))
+                plt.close()
+                return False
+
     pattern = {
         'Audio': audio.astype(np.float32),
         'Spectrogram': spect.astype(np.float32),
@@ -437,15 +678,15 @@ def Pattern_File_Generate(
 
 def Note_Predictor(log_f0):
     '''
-    log_f0: [F0_t]
+    f0: [F0_t]
     '''
     notes = np.arange(0, 128)
-    log_f0s = np.log(440 * 2 ** ((notes - 69 - 12) / 12))
-    log_f0s[0] = 0.0
-    criterion = np.expand_dims(log_f0s, axis= 0)   # [1, 128]
+    f0s = 440 * 2 ** ((notes - 69 - 12) / 12)
+    f0s[0] = 0.0
+    criterion = np.expand_dims(f0s, axis= 0)   # [1, 128]
 
     return np.argmin(
-        np.abs(np.expand_dims(log_f0, axis= 1) - criterion),
+        np.abs(np.expand_dims(np.exp(log_f0), axis= 1) - criterion),
         axis= 1
         )
 
@@ -458,7 +699,8 @@ def Token_Dict_Generate(hyper_parameters: Namespace):
     os.makedirs(os.path.dirname(hyper_parameters.Token_Path), exist_ok= True)
     yaml.dump(
         {token: index for index, token in enumerate(['<S>', '<E>', '<X>'] + sorted(tokens))},
-        open(hyper_parameters.Token_Path, 'w')
+        open(hyper_parameters.Token_Path, 'w', encoding='utf-8-sig'),
+        allow_unicode= True
         )
 
 def Metadata_Generate(
@@ -635,7 +877,7 @@ if __name__ == '__main__':
 
     Token_Dict_Generate(hyper_parameters= hp)
     if args.csd_path:
-        CSD_Fix(
+        CSD(
             hyper_paramters= hp,
             dataset_path= args.csd_path
             )
@@ -648,6 +890,4 @@ if __name__ == '__main__':
     Metadata_Generate(hp, False)
     Metadata_Generate(hp, True)
 
-# python Pattern_Generator.py -hp Hyper_Parameters/Hyper_Parameters_Temp.yaml -csd D:/Datasets/rawdata_music/CSD
-
-# python Pattern_Generator.py -hp Hyper_Parameters/Hyper_Parameters_Temp.yaml -am D:/Datasets/rawdata_music/AIHub
+# python Pattern_Generator.py -hp Hyper_Parameters.yaml -csd F:/Rawdata_Music/CSD_1.1/korean

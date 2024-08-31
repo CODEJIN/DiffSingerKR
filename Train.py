@@ -80,9 +80,9 @@ class Trainer:
                 wandb.watch(self.model_dict['DiffSinger'])
 
     def Dataset_Generate(self):
-        token_dict = yaml.load(open(self.hp.Token_Path), Loader=yaml.Loader)
-        singer_info_dict = yaml.load(open(self.hp.Singer_Info_Path), Loader=yaml.Loader)
-        genre_info_dict = yaml.load(open(self.hp.Genre_Info_Path), Loader=yaml.Loader)
+        token_dict = yaml.load(open(self.hp.Token_Path, encoding= 'utf-8-sig'), Loader=yaml.Loader)
+        singer_info_dict = yaml.load(open(self.hp.Singer_Info_Path, encoding= 'utf-8-sig'), Loader=yaml.Loader)
+        genre_info_dict = yaml.load(open(self.hp.Genre_Info_Path, encoding= 'utf-8-sig'), Loader=yaml.Loader)
 
         if self.hp.Feature_Type == 'Spectrogram':
             self.feature_range_info_dict = yaml.load(open(self.hp.Spectrogram_Range_Info_Path), Loader=yaml.Loader)
@@ -578,9 +578,9 @@ class Trainer:
             path = os.path.join(self.hp.Checkpoint_Path, 'S_{}.pt'.format(self.steps).replace('\\', '/'))
 
         state_dict = torch.load(path, map_location= 'cpu')
-        self.model_dict['DiffSVS'].load_state_dict(state_dict['Model']['DiffSVS'])
-        self.optimizer_dict['DiffSVS'].load_state_dict(state_dict['Optimizer']['DiffSVS'])
-        self.scheduler_dict['DiffSVS'].load_state_dict(state_dict['Scheduler']['DiffSVS'])
+        self.model_dict['DiffSinger'].load_state_dict(state_dict['Model']['DiffSinger'])
+        self.optimizer_dict['DiffSinger'].load_state_dict(state_dict['Optimizer']['DiffSinger'])
+        self.scheduler_dict['DiffSinger'].load_state_dict(state_dict['Scheduler']['DiffSinger'])
         self.steps = state_dict['Steps']
 
         logging.info('Checkpoint loaded at {} steps in GPU {}.'.format(self.steps, self.gpu_id))
@@ -592,13 +592,13 @@ class Trainer:
         os.makedirs(self.hp.Checkpoint_Path, exist_ok= True)
         state_dict = {
             'Model': {
-                'DiffSVS': self.model_dict['DiffSVS'].state_dict(),
+                'DiffSinger': self.model_dict['DiffSinger'].state_dict(),
                 },
             'Optimizer': {
-                'DiffSVS': self.optimizer_dict['DiffSVS'].state_dict(),
+                'DiffSinger': self.optimizer_dict['DiffSinger'].state_dict(),
                 },
             'Scheduler': {
-                'DiffSVS': self.scheduler_dict['DiffSVS'].state_dict(),
+                'DiffSinger': self.scheduler_dict['DiffSinger'].state_dict(),
                 },
             'Steps': self.steps
             }
